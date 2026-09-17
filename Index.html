@@ -1,0 +1,414 @@
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import webbrowser
+
+HTML = r'''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width,
+      initial-scale=1.0">
+
+<title>Lyrics ASCII</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #000;
+
+    overflow: hidden;
+}
+
+#output {
+    font-family: monospace;
+
+    font-size: 16px;
+    font-weight: bold;
+
+    line-height: 1;
+
+    text-align: center;
+
+    white-space: nowrap;
+
+    transform: scale(1.15);
+
+    filter:
+        brightness(1.8)
+        drop-shadow(0 0 15px #ee75d2)
+        drop-shadow(0 0 35px #ee75d2);
+}
+
+#canvas {
+    display: none;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="output"></div>
+
+<canvas id="canvas"
+        width="100"
+        height="35">
+</canvas>
+
+<script>
+
+const lyrics = [
+
+    {
+        text: "Do you think",
+        showMs: 2500,
+        hideMs: 700
+    },
+
+    {
+        text: "I have forgotten",
+        showMs: 3000,
+        hideMs: 700
+    },
+
+    {
+        text: "About you?",
+        showMs: 3000,
+        hideMs: 700
+    },
+
+    {
+        text: "There was something",
+        showMs: 2500,
+        hideMs: 700
+    },
+
+    {
+        text: "'bout you",
+        showMs: 2200,
+        hideMs: 700
+    },
+
+    {
+        text: "That now I can't remember",
+        showMs: 3500,
+        hideMs: 1200
+    }
+
+];
+
+
+const chars = [
+
+    " ",
+    ".",
+    ":",
+    "-",
+    "=",
+    "+",
+    "*",
+    "#",
+    "@"
+
+];
+
+
+const canvas =
+    document.getElementById("canvas");
+
+const output =
+    document.getElementById("output");
+
+const ctx =
+    canvas.getContext("2d");
+
+
+let lyricIndex = 0;
+
+let showing = true;
+
+let timer = 0;
+
+let lastTime = 0;
+
+
+function drawText() {
+
+    ctx.fillStyle = "black";
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    if (!showing) {
+        return;
+    }
+
+
+    const text =
+        lyrics[lyricIndex].text;
+
+
+    ctx.fillStyle = "white";
+
+    ctx.textAlign = "center";
+
+    ctx.textBaseline = "middle";
+
+
+    ctx.font =
+        '900 15px Arial Black, Impact, sans-serif';
+
+
+    ctx.fillText(
+        text,
+        canvas.width / 2,
+        canvas.height / 2
+    );
+
+}
+
+
+function animate(time) {
+
+    if (!lastTime) {
+        lastTime = time;
+    }
+
+
+    const delta =
+        time - lastTime;
+
+    lastTime = time;
+
+    timer += delta;
+
+
+    const current =
+        lyrics[lyricIndex];
+
+
+    const duration =
+        showing
+            ? current.showMs
+            : current.hideMs;
+
+
+    if (timer >= duration) {
+
+        timer = 0;
+
+
+        if (showing) {
+
+            showing = false;
+
+        }
+
+        else {
+
+            showing = true;
+
+            lyricIndex++;
+
+
+            if (
+                lyricIndex >= lyrics.length
+            ) {
+
+                lyricIndex = 0;
+
+            }
+
+        }
+
+    }
+
+
+    drawText();
+
+
+    const data =
+        ctx.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        ).data;
+
+
+    let result = "";
+
+
+    for (
+        let y = 0;
+        y < canvas.height;
+        y++
+    ) {
+
+        let row = "";
+
+
+        for (
+            let x = 0;
+            x < canvas.width;
+            x++
+        ) {
+
+            const index =
+                (x + y * canvas.width) * 4;
+
+
+            const r =
+                data[index];
+
+            const g =
+                data[index + 1];
+
+            const b =
+                data[index + 2];
+
+
+            const brightness =
+                (r + g + b) / 3;
+
+
+            let charIndex =
+                Math.floor(
+                    brightness /
+                    256 *
+                    chars.length
+                );
+
+
+            charIndex =
+                Math.max(
+                    0,
+                    Math.min(
+                        charIndex,
+                        chars.length - 1
+                    )
+                );
+
+
+            const char =
+                chars[charIndex];
+
+
+            if (brightness > 10) {
+
+                row +=
+                    `<span style="
+                    color:rgb(
+                        ${r},
+                        ${g},
+                        ${b}
+                    );
+                    ">${char}</span>`;
+
+            }
+
+            else {
+
+                row += "&nbsp;";
+
+            }
+
+        }
+
+
+        result +=
+            `<div>${row}</div>`;
+
+    }
+
+
+    output.innerHTML = result;
+
+
+    requestAnimationFrame(animate);
+
+}
+
+
+requestAnimationFrame(animate);
+
+</script>
+
+</body>
+</html>
+'''
+
+
+class Handler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+
+        self.send_response(200)
+
+        self.send_header(
+            "Content-Type",
+            "text/html; charset=utf-8"
+        )
+
+        self.end_headers()
+
+        self.wfile.write(
+            HTML.encode("utf-8")
+        )
+
+
+    def log_message(self, format, *args):
+        pass
+
+
+PORT = 8080
+
+
+server = HTTPServer(
+    ("127.0.0.1", PORT),
+    Handler
+)
+
+
+print()
+print("==============================")
+print("       LYRICS ASCII ART")
+print("==============================")
+print()
+print(
+    "Open: http://127.0.0.1:8080"
+)
+print()
+
+
+try:
+
+    webbrowser.open(
+        "http://127.0.0.1:8080"
+    )
+
+except:
+
+    pass
+
+
+server.serve_forever()
