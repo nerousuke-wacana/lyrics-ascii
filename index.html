@@ -1,0 +1,271 @@
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import webbrowser
+
+HTML = r'''
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lyrics to ASCII Art</title>
+
+<style>
+:root {
+    --color-primary: #ee75d2;
+    --brightness: 1.4;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    color: var(--color-primary);
+    overflow: hidden;
+}
+
+#output {
+    text-align: center;
+    font-family: monospace;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1;
+    filter: brightness(var(--brightness))
+            drop-shadow(0 0 40px var(--color-primary));
+}
+
+#prerender {
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<div id="output"></div>
+<canvas id="prerender" width="150" height="50"></canvas>
+
+<script>
+
+const lyrics = [
+    {text: "Do you think", showMs: 2000, hideMs: 500},
+    {text: "I have forgotten", showMs: 3500, hideMs: 1000},
+    {text: "About you?", showMs: 4000, hideMs: 1500},
+    {text: "There was something", showMs: 2500, hideMs: 400},
+    {text: "'bout you", showMs: 2000, hideMs: 800},
+    {text: "That now I can't remember", showMs: 3500, hideMs: 2000}
+];
+
+const chars = [
+    "_", ".", ",", "-", "=", "+",
+    "i", "s", "c", "b", "a",
+    "!", "?", "0", "1", "2", "3",
+    "4", "5", "6", "9", "8",
+    "✚", "⚛︎", "☺︎", "☹︎",
+    "☀︎", "@", "#", "X", "Y", "Z", "'"
+];
+
+const canvas = document.getElementById("prerender");
+const output = document.getElementById("output");
+const ctx = canvas.getContext("2d");
+
+let lyricIndex = 0;
+let showing = true;
+let timer = 0;
+let lastTime = 0;
+
+function drawText() {
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!showing) return;
+
+    const text = lyrics[lyricIndex].text;
+
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = '900 14px "Arial Black", Impact, sans-serif';
+
+    const words = text.split(" ");
+    let lines = [];
+    let line = words[0] || "";
+
+    for (let i = 1; i < words.length; i++) {
+
+        const test = line + " " + words[i];
+
+        if (ctx.measureText(test).width < canvas.width - 10) {
+            line = test;
+        } else {
+            lines.push(line);
+            line = words[i];
+        }
+    }
+
+    lines.push(line);
+
+    const lineHeight = 16;
+    const totalHeight = lines.length * lineHeight;
+
+    const startY =
+        canvas.height / 2 -
+        totalHeight / 2 +
+        lineHeight / 2;
+
+    for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(
+            lines[i],
+            canvas.width / 2,
+            startY + i * lineHeight
+        );
+    }
+}
+
+function animate(time) {
+
+    if (!lastTime) lastTime = time;
+
+    const delta = time - lastTime;
+    lastTime = time;
+
+    timer += delta;
+
+    const current = lyrics[lyricIndex];
+
+    const duration =
+        showing ? current.showMs : current.hideMs;
+
+    if (timer >= duration) {
+
+        timer = 0;
+
+        if (showing) {
+
+            showing = false;
+
+        } else {
+
+            showing = true;
+            lyricIndex++;
+
+            if (lyricIndex >= lyrics.length) {
+                lyricIndex = 0;
+            }
+        }
+    }
+
+    drawText();
+
+    const data = ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    ).data;
+
+    let result = "";
+
+    for (let y = 0; y < canvas.height; y++) {
+
+        let row = "";
+
+        for (let x = 0; x < canvas.width; x++) {
+
+            const index =
+                (x + y * canvas.width) * 4;
+
+            const r = data[index];
+            const g = data[index + 1];
+            const b = data[index + 2];
+
+            const brightness =
+                (r + g + b) / 3;
+
+            const charIndex = Math.floor(
+                brightness /
+                256 *
+                chars.length
+            );
+
+            const safeIndex =
+                Math.min(
+                    charIndex,
+                    chars.length - 1
+                );
+
+            const char =
+                chars[safeIndex];
+
+            row +=
+                `<span style="color:rgb(${r},${g},${b})">${char}</span>`;
+        }
+
+        result += `<div>${row}</div>`;
+    }
+
+    output.innerHTML = result;
+
+    requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+
+</script>
+
+</body>
+</html>
+'''
+
+
+class Handler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            "text/html; charset=utf-8"
+        )
+        self.end_headers()
+
+        self.wfile.write(
+            HTML.encode("utf-8")
+        )
+
+    def log_message(self, format, *args):
+        pass
+
+
+PORT = 8080
+
+server = HTTPServer(
+    ("127.0.0.1", PORT),
+    Handler
+)
+
+print("=" * 40)
+print("   LYRICS TO ASCII ART")
+print("=" * 40)
+print()
+print("Buka browser HP:")
+print(f"http://127.0.0.1:{PORT}")
+print()
+print("Tekan CTRL+C untuk berhenti.")
+
+try:
+    webbrowser.open(
+        f"http://127.0.0.1:{PORT}"
+    )
+except:
+    pass
+
+server.serve_forever()
